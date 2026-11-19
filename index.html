@@ -61,6 +61,9 @@ td,th{border-bottom:1px solid #e3e8e5;padding:6px 4px;text-align:left;vertical-a
 .toast{position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#333;color:#fff;padding:10px 18px;border-radius:20px;font-size:14px;z-index:20;max-width:90%;text-align:center}
 .small{font-size:12px;color:var(--sub)}
 .tag{display:inline-block;background:var(--g2);color:var(--g);border-radius:8px;padding:2px 8px;font-size:12px}
+.fwrap{position:relative}
+.fwrap textarea{resize:none;overflow:hidden;line-height:1.5;padding-right:46px;min-height:46px;display:block}
+.clr{position:absolute;right:6px;top:7px;width:32px;height:32px;border-radius:50%;border:0;background:#e3e8e5;color:#5d6b62;font-size:15px}
 .mini{border:0;background:var(--g2);color:var(--g);border-radius:8px;padding:8px 10px;font-size:14px}
 </style>
 </head>
@@ -87,7 +90,7 @@ const DEFAULT={levels:[
   {key:"L1-02",lv:1,order:2,icon:"🌇",title:"帰りのあいさつ",title_id:"Salam pulang kerja",scene:"仕事が終わって帰るとき",scene_id:"Pekerjaan selesai, waktunya pulang.",boss:"お疲れ様でした。",boss_id:"Terima kasih atas kerja kerasnya.",reply:"お疲れ様でした。",kana:"おつかれさまでした",romaji:"Otsukaresama deshita.",reply_id:"Terima kasih atas kerja kerasnya."},
   {key:"L1-03",lv:1,order:3,icon:"☕",title:"休憩の指示",title_id:"Perintah istirahat",scene:"休憩の時間",scene_id:"Waktu istirahat.",boss:"休憩です。",boss_id:"Sekarang istirahat.",reply:"はい、分かりました。",kana:"はい、わかりました",romaji:"Hai, wakarimashita.",reply_id:"Ya, saya mengerti."},
   {key:"L1-04",lv:1,order:4,icon:"🍙",title:"お昼休憩の指示",title_id:"Perintah istirahat siang",scene:"お昼の時間",scene_id:"Waktu makan siang.",boss:"お昼休憩です。",boss_id:"Sekarang istirahat siang.",reply:"はい、分かりました。",kana:"はい、わかりました",romaji:"Hai, wakarimashita.",reply_id:"Ya, saya mengerti."},
-  {key:"L1-05",lv:1,order:5,icon:"🧑‍🌾",title:"仕事の始まり",title_id:"Awal kerja",scene:"朝、仕事が始まるとき",scene_id:"Pagi, saat pekerjaan akan dimulai.",boss:"仕事が始まります。",boss_id:"Pekerjaan akan dimulai.",prompt:"今日の仕事を日本語で聞いてください。",prompt_id:"Silakan tanyakan pekerjaan hari ini dalam bahasa Jepang.",reply:"今日の仕事は何ですか？",kana:"きょうのしごとはなんですか",romaji:"Kyō no shigoto wa nan desu ka?",reply_id:"Apa pekerjaan hari ini?"},
+  {key:"L1-05",lv:1,order:5,icon:"🧑‍🌾",title:"仕事の始まり",title_id:"Awal kerja",scene:"朝、仕事が始まるとき",scene_id:"Pagi, saat pekerjaan akan dimulai.",boss:"仕事が始まります。",boss_id:"Pekerjaan akan dimulai.",prompt:"今日の仕事を聞いてください。",prompt_id:"Tanyakan pekerjaan hari ini.",reply:"今日の仕事は何ですか？",kana:"きょうのしごとはなんですか",romaji:"Kyō no shigoto wa nan desu ka?",reply_id:"Apa pekerjaan hari ini?"},
   {key:"L1-06",lv:1,order:6,icon:"🧹",title:"仕事の終わり",title_id:"Akhir kerja",scene:"今日の仕事が終わったとき",scene_id:"Saat pekerjaan hari ini selesai.",boss:"今日の仕事は終わりました。",boss_id:"Pekerjaan hari ini sudah selesai.",reply:"はい、分かりました。後片付けをします。",kana:"はい、わかりました。あとかたづけをします",romaji:"Hai, wakarimashita. Atokatazuke o shimasu.",reply_id:"Ya, saya mengerti. Saya akan beres-beres."}
  ]};
 const LIMIT=3;   // 1つの言葉の記録は3回まで（3回でクリア）
@@ -95,7 +98,7 @@ const LIMIT=3;   // 1つの言葉の記録は3回まで（3回でクリア）
 /* ===== 保存 ===== */
 const S={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch(e){return d}},
          set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){toast('保存できませんでした')}}};
-const APP_VER='v1.3.4';
+const APP_VER='v1.5';
 /* 5番「仕事の始まり」に日本人の言葉が無い古い教材を自動で直す（シートから読んだ時も） */
 function fixCurriculum(c){
   let fixed=null;const x=c.lessons.find(l=>l.key==='L1-05');
@@ -125,7 +128,7 @@ const starStr=n=>'★'.repeat(n)+'☆'.repeat(5-n);
 const count=(name,key)=>records().filter(r=>r.name===name&&r.key===key).length;
 const cleared=(name,key)=>count(name,key)>=LIMIT;
 const lvDone=(name,lv)=>{const ls=lessonsOf(lv);return ls.length>0&&ls.every(x=>cleared(name,x.key))};
-function lvOpen(name,lv){const ls=levels();const i=ls.findIndex(l=>l.lv===lv);return i<=0||lvDone(name,ls[i-1].lv)}
+function lvOpen(name,lv){if(S.get('kj_openall',false))return true;const ls=levels();const i=ls.findIndex(l=>l.lv===lv);return i<=0||lvDone(name,ls[i-1].lv)}
 /* ===== 音声（iPhone・Android対策版） ===== */
 let JA_VOICE=null,ID_VOICE=null,audioUnlocked=false;
 function pickVoice(){
@@ -135,7 +138,10 @@ function pickVoice(){
   ID_VOICE=vs.find(v=>/^(id|in)[-_]/i.test(v.lang)&&/Damayanti|Google/i.test(v.name))||vs.find(v=>/^(id|in)([-_]|$)/i.test(v.lang))||null;
 }
 /* 研修生への指示（インドネシア語の音声） */
-const promptId=x=>x.prompt_id||(x.boss?'Silakan jawab dalam bahasa Jepang.':'Silakan bertanya dalam bahasa Jepang.');
+const AUTO_JA='日本語で言ってください。',AUTO_ID='Silakan ucapkan dalam bahasa Jepang.';
+/* 追加の指示（任意）＋ 必ず「日本語で言ってください。」を付ける（追加の指示に「bahasa Jepang」が入っていれば重ねない） */
+const promptId=x=>{const p=String(x.prompt_id||'').trim();return !p?AUTO_ID:/bahasa\s+jepang/i.test(p)?p:p.replace(/[.。]?$/,'.')+' '+AUTO_ID};
+const promptJa=x=>{const p=String(x.prompt||'').trim();return !p?AUTO_JA:/日本語で/.test(p)?p:p.replace(/[。.]?$/,'。')+AUTO_JA};
 /* 日本人の言葉（日本語）→ 指示（インドネシア語）を続けて再生 */
 function playScene(x){
   const seq=[];
@@ -199,7 +205,7 @@ function Home(){
     if(!ls.length){h+=`<p class="small">教材は準備中です / Materi segera hadir.</p></div>`;return}
     const c=ls.filter(x=>cleared(nm,x.key)).length;
     h+=`<div class="lvbar"><i style="width:${c/ls.length*100}%"></i></div><div class="small">クリア ${c} / ${ls.length}${c===ls.length?'　🎉 レベルクリア！':''}</div>
-    ${open?'':'<p class="small">前のレベルをクリアすると開きます</p>'}</div>`;
+    ${open?'':`<p class="small">🔒 前のレベルをクリアすると開きます（言葉${ls.length}件）<br>確認したいときは ⚙ →「全レベルを開く」</p>`}</div>`;
     if(open)ls.forEach((x,i)=>{const n=Math.min(count(nm,x.key),LIMIT);
       h+=`<div class="lesson" onclick="openLesson('${x.key}')"><div class="ic">${esc(x.icon)}</div>
       <div class="t"><b>${i+1}. ${esc(x.title)}</b><span class="id">${esc(x.title_id)}</span></div>
@@ -226,7 +232,7 @@ function Lesson(){
   h+=x.boss?`<div class="boss"><div class="jp">「${esc(x.boss)}」</div><div class="idtx">🇮🇩 ${esc(x.boss_id)}</div>${spk(x.boss,'🔊 日本語')}</div>`
     :`<div class="boss"><div class="idtx">研修生から先に話します。<br>🇮🇩 Anda yang bicara duluan.</div></div>`;
   h+=`<div style="margin-top:12px"><span class="step">② 研修生 / Peserta</span>
-  <div class="reply"><div class="idtx" style="margin:0 0 6px"><b>🇮🇩 ${esc(promptId(x))}</b><br><span class="small">（日本語で${x.boss?'答えて':'聞いて'}ください）</span>
+  <div class="reply"><div class="idtx" style="margin:0 0 6px"><b>🇮🇩 ${esc(promptId(x))}</b><br><span class="small">（${esc(promptJa(x))}）</span>
     <button class="spk" data-t="${esc(promptId(x))}" onclick="speak(this.dataset.t,'id')">🔊 Indonesia</button></div>
     <div class="jp">「${esc(x.reply)}」</div><div class="kana">${esc(x.kana)}</div>
     <div class="romaji">${esc(x.romaji)}</div><div class="idtx">🇮🇩 ${esc(x.reply_id)}</div>${spk(x.reply,'🔊 お手本 / Contoh')}</div></div></div>
@@ -311,7 +317,7 @@ function Edit(){
   <p class="small">日本語を入力すると、インドネシア語に自動翻訳します。保存した教材はシート「教材」に残り、会社の学習プログラムになります。</p>
   <select onchange="st.editLv=+this.value;Edit()">${L.map(l=>`<option value="${l.lv}" ${l.lv===lv?'selected':''}>レベル${l.lv}　${esc(l.name)}（${lessonsOf(l.lv).length}件）</option>`).join('')}</select>
   <div class="row" style="margin-top:8px"><button class="btn sub sm" onclick="editLevel(${lv})">レベル名を変更</button><button class="btn sub sm" onclick="addLevel()">＋ レベル追加</button></div></div>
-  <button class="btn" onclick="st.editKey=null;go('lessonEdit')">＋ レベル${lv}に言葉を追加</button><div style="height:10px"></div>`;
+  <button class="btn" onclick="st.editKey=null;go('lessonEdit')">＋ レベル${lv}に言葉を追加</button><p class="small">※ 別のレベルに入れたいときは、上の選択でレベルを変えてから押してください。入れた後でも、✏ の「レベル」で移動できます。</p><div style="height:10px"></div>`;
   const ls=lessonsOf(lv);
   ls.forEach((x,i)=>{h+=`<div class="lesson"><div class="ic">${esc(x.icon)}</div>
     <div class="t"><b>${i+1}. ${esc(x.title)}</b><span class="small">${esc(x.boss||'（研修生から）')} → ${esc(x.reply)}</span></div>
@@ -327,29 +333,43 @@ function Edit(){
 }
 function LessonEdit(){
   const x=st.editKey?lessonBy(st.editKey):{icon:'🌾',lv:st.editLv};
-  const f=(id,label,ph='')=>`<label>${label}</label><input id="f_${id}" value="${esc(x[id]||'')}" placeholder="${esc(ph)}">`;
-  $app().innerHTML=`<div class="card"><h2>${st.editKey?'言葉を編集':'言葉を追加'}（レベル${x.lv}）</h2>
-  <span class="step">日本語（入力）</span>
+  const f=(id,label,ph='')=>`<label>${label}</label><div class="fwrap"><textarea id="f_${id}" rows="1" placeholder="${esc(ph)}" oninput="grow(this)">${esc(x[id]||'')}</textarea><button type="button" class="clr" onclick="clearField('${id}')" aria-label="消す">✕</button></div>`;
+  $app().innerHTML=`<div class="card"><h2>${st.editKey?'言葉を編集':'言葉を追加'}</h2>
+  <label>レベル（ここで選んだレベルに入ります）</label>
+  <select id="f_lv">${levels().map(l=>`<option value="${l.lv}" ${+l.lv===+x.lv?'selected':''}>レベル${l.lv}　${esc(l.name)}</option>`).join('')}</select>
+  <span class="step" style="margin-top:12px">日本語（入力）</span>
   ${f('icon','アイコン（絵文字）','🌾')}
   ${f('title','課題名','例：水見回り')}
   ${f('scene','場面','例：朝、田んぼに行く前')}
   ${f('boss','日本人の言葉（研修生から話す場合は空欄）','例：田んぼの水を見てきてください。')}
   ${f('reply','研修生の言葉','例：はい、分かりました。見てきます。')}
   ${f('kana','よみがな（任意・ひらがな）','例：はい、わかりました。みてきます')}
-  ${f('prompt','研修生への指示（任意・空欄なら「日本語で答えてください」）','例：日本語でくり返してください')}
+  ${f('prompt','追加の指示（任意）','例：今日の仕事を聞いてください')}
+  <p class="small">※「日本語で言ってください。」は自動で付きます。打たなくてOKです。</p>
   <button class="btn blue" id="trBtn" onclick="autoTranslate()">🌐 インドネシア語に自動翻訳</button></div>
   <div class="card"><span class="step">インドネシア語（自動・手直しOK）</span>
-  ${f('title_id','課題名')}${f('scene_id','場面')}${f('boss_id','日本人の言葉')}${f('reply_id','研修生の言葉')}${f('prompt_id','研修生への指示（音声で流れます）')}${f('romaji','ローマ字（よみがなから自動）')}</div>
+  ${f('title_id','課題名')}${f('scene_id','場面')}${f('boss_id','日本人の言葉')}${f('reply_id','研修生の言葉')}${f('prompt_id','追加の指示（「Silakan ucapkan dalam bahasa Jepang.」は自動で付きます）')}${f('romaji','ローマ字（よみがなから自動）')}</div>
   <button class="btn" onclick="saveLesson()">💾 保存</button>
+  <button class="btn sub" onclick="clearAll()">🧹 入力を全部消す</button>
   ${st.editKey?`<button class="btn warn" onclick="deleteLesson()">この言葉を削除</button>`:''}`;
+  setTimeout(growAll,0);
 }
+/* 入力欄の高さを文字に合わせて広げる */
+function grow(el){el.style.height='auto';el.style.height=(el.scrollHeight+2)+'px'}
+function growAll(){document.querySelectorAll('.fwrap textarea').forEach(grow)}
+/* ✕ で一発クリア（日本語を消したら、その翻訳も消す） */
+const PAIR={title:'title_id',scene:'scene_id',boss:'boss_id',reply:'reply_id',prompt:'prompt_id',kana:'romaji'};
+function clearField(id){const el=$('f_'+id);el.value='';grow(el);
+  const p=PAIR[id];if(p&&$('f_'+p)){$('f_'+p).value='';grow($('f_'+p))}el.focus()}
+function clearAll(){if(!confirm('入力を全部消しますか？（保存するまでは元に戻せます）'))return;
+  document.querySelectorAll('.fwrap textarea').forEach(t=>{if(t.id!=='f_icon'){t.value='';grow(t)}})}
 async function autoTranslate(){
   const ids=['title','scene','boss','reply','prompt'],texts=ids.map(i=>$('f_'+i).value.trim());
-  const kana=$('f_kana').value.trim();if(kana&&!$('f_romaji').value)$('f_romaji').value=toRomaji(kana);
+  const kana=$('f_kana').value.trim();if(kana&&!$('f_romaji').value){$('f_romaji').value=toRomaji(kana);grow($('f_romaji'))}
   if(!hasGas())return toast('自動翻訳にはGASの設定が必要です');
   const b=$('trBtn');b.disabled=true;b.textContent='翻訳中…';
   try{const r=await post({action:'translate',texts},true);
-    if(!r.ok)throw 0;ids.forEach((id,i)=>{if(texts[i])$('f_'+id+'_id').value=r.out[i]});toast('翻訳しました。必要なら手直ししてください')}
+    if(!r.ok)throw 0;ids.forEach((id,i)=>{if(texts[i])$('f_'+id+'_id').value=r.out[i]});growAll();toast('翻訳しました。必要なら手直ししてください')}
   catch(e){toast('⚠ 翻訳できませんでした')}
   b.disabled=false;b.textContent='🌐 インドネシア語に自動翻訳';
 }
@@ -357,14 +377,14 @@ async function saveLesson(){
   const v=id=>$('f_'+id).value.trim();
   if(!v('title')||!v('reply'))return toast('課題名と研修生の言葉は必須です');
   const c=CUR(),old=st.editKey?lessonBy(st.editKey):null;
-  const lv=old?old.lv:st.editLv,maxO=Math.max(0,...lessonsOf(lv).map(x=>+x.order||0));
-  const x={...(old||{}),key:old?old.key:'L'+lv+'-'+Date.now().toString(36),lv,order:old?old.order:maxO+1,
+  const lv=+$('f_lv').value,moved=!old||+old.lv!==lv,maxO=Math.max(0,...lessonsOf(lv).filter(l=>!old||l.key!==old.key).map(x=>+x.order||0));
+  const x={...(old||{}),key:old?old.key:'L'+lv+'-'+Date.now().toString(36),lv,order:moved?maxO+1:old.order,
     icon:v('icon')||'🌾',title:v('title'),title_id:v('title_id'),scene:v('scene'),scene_id:v('scene_id'),
     boss:v('boss'),boss_id:v('boss_id'),reply:v('reply'),kana:v('kana'),romaji:v('romaji')||(v('kana')?toRomaji(v('kana')):''),reply_id:v('reply_id'),prompt:v('prompt'),prompt_id:v('prompt_id'),
     author:S.get('kj_eval',''),updated:today()};
   if(!x.reply_id&&hasGas()&&!confirm('インドネシア語が空です。このまま保存しますか？'))return;
   c.lessons=c.lessons.filter(l=>l.key!==x.key).concat(x);S.set('kj_curriculum',c);
-  await syncLesson(x);go('edit');
+  st.editLv=lv;await syncLesson(x);go('edit');
 }
 async function deleteLesson(){
   if(!confirm('この言葉を削除しますか？（シートには「削除」として残ります）'))return;
@@ -456,12 +476,14 @@ function Settings(){
   <div class="card"><h2>🔊 音声テスト</h2><button class="btn blue" onclick="voiceTest()">日本語 → インドネシア語を続けて鳴らす</button>
   <div class="row" style="margin-top:8px"><button class="btn sub sm" onclick="speak('おはようございます','ja')">🇯🇵 日本語だけ</button><button class="btn sub sm" onclick="speak('Selamat pagi. Silakan ucapkan dalam bahasa Jepang.','id')">🇮🇩 インドネシア語だけ</button></div><p class="small" id="vinfo"></p>
   <label><input type="checkbox" style="width:auto" ${S.get('kj_autoplay',true)?'checked':''} onchange="S.set('kj_autoplay',this.checked)"> 課題を開いたら自動で再生する</label></div>
+  <div class="card"><h2>🔓 レベルの鍵</h2><label><input type="checkbox" style="width:auto" ${S.get('kj_openall',false)?'checked':''} onchange="S.set('kj_openall',this.checked);toast(this.checked?'全レベルを開きました':'鍵を元に戻しました')"> 全レベルを開く（教材の確認用・上級の研修生用）</label>
+  <p class="small">ふだんはオフ。オフのときは前のレベルをクリアすると次が開きます。</p></div>
   <div class="card"><h2>🧑‍💼 評価者（日本人）の名前</h2><input id="ev" value="${esc(S.get('kj_eval',''))}" placeholder="例: 野副"></div>
   <div class="card"><h2>🔐 管理者の暗証番号</h2><p class="small">教材編集と設定を開くときに聞きます（空欄なら聞きません）。</p><input id="pin" type="password" inputmode="numeric" value="${esc(S.get('kj_pin',''))}"></div>
   <div class="card"><h2>📄 GAS（シート・翻訳・LINE）</h2><input id="gas" value="${esc(S.get('kj_gas',''))}" placeholder="https://script.google.com/macros/s/.../exec"></div>
   <button class="btn" onclick="saveSettings()">設定を保存</button>
   <div class="card" style="margin-top:12px"><button class="btn warn" onclick="if(confirm('この端末の学習記録を消しますか？（シートは消えません）')){S.set('kj_records',[]);toast('消去しました')}">この端末の学習記録を消す</button>
-  <p class="small">${APP_VER}　5番の自動修正</p></div>`;
+  <p class="small">${APP_VER}　入力欄の改良・指示の自動付与</p></div>`;
 }
 function saveSettings(){
   S.set('kj_eval',$('ev').value.trim());S.set('kj_pin',$('pin').value.trim());S.set('kj_gas',$('gas').value.trim());
