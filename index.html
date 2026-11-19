@@ -98,7 +98,7 @@ const LIMIT=3;   // 1つの言葉の記録は3回まで（3回でクリア）
 /* ===== 保存 ===== */
 const S={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch(e){return d}},
          set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){toast('保存できませんでした')}}};
-const APP_VER='v1.5';
+const APP_VER='v1.5.1';
 /* 5番「仕事の始まり」に日本人の言葉が無い古い教材を自動で直す（シートから読んだ時も） */
 function fixCurriculum(c){
   let fixed=null;const x=c.lessons.find(l=>l.key==='L1-05');
@@ -301,12 +301,36 @@ async function sendLine(){
     toast(r.unknown?'送信しました（結果はシートのログで確認）':r.ok?'✅ LINEで送りました':'⚠ '+(r.error||'送れませんでした'))}
   catch(e){toast('⚠ 通信できませんでした')}
 }
+/* シートの教材とスマホの教材を「合わせる」（丸ごと置き換えない）
+   ・同じ言葉（課題ID）はシートの内容を優先
+   ・シートに無い言葉（初期のレベル1も含む）は残して、シートへ書き足す
+   ・削除した言葉はシートに「削除」として残るので、削除のまま */
+function mergeCurriculum(sheet){
+  const local=CUR(),m=new Map(),lm=new Map();
+  DEFAULT.lessons.forEach(l=>m.set(l.key,{...l}));
+  local.lessons.forEach(l=>m.set(l.key,{...(m.get(l.key)||{}),...l}));
+  const sheetKeys=new Set();
+  (sheet.lessons||[]).forEach(l=>{if(!l.key)return;sheetKeys.add(String(l.key));
+    const clean={};Object.keys(l).forEach(k=>{if(l[k]!==undefined&&l[k]!==null&&!(l[k]===''&&k!=='boss'&&k!=='prompt'&&k!=='prompt_id'))clean[k]=l[k]});
+    m.set(l.key,{...(m.get(l.key)||{}),...clean,lv:+l.lv,order:+l.order||0,deleted:!!l.deleted})});
+  DEFAULT.levels.forEach(L=>lm.set(+L.lv,{...L}));
+  local.levels.forEach(L=>lm.set(+L.lv,{...(lm.get(+L.lv)||{}),...L}));
+  const sheetLv=new Set();(sheet.levels||[]).forEach(L=>{sheetLv.add(+L.lv);lm.set(+L.lv,{...(lm.get(+L.lv)||{}),...L,lv:+L.lv})});
+  const c={levels:[...lm.values()],lessons:[...m.values()]};
+  const fixed=fixCurriculum(c);
+  const missing=c.lessons.filter(l=>!sheetKeys.has(String(l.key))||(fixed&&l.key===fixed.key));
+  const missingLv=c.levels.filter(L=>!sheetLv.has(+L.lv));
+  return {c,missing,missingLv};
+}
 async function loadCurriculum(silent){
   if(!hasGas())return silent||toast('⚙設定でGASのURLを入れてください');
   try{const r=await post({action:'getLessons'},true);
-    if(r.ok&&r.lessons&&r.lessons.length){const c={levels:r.levels.length?r.levels:CUR().levels,lessons:r.lessons};const f=fixCurriculum(c);S.set('kj_curriculum',c);if(f)post({action:'saveLesson',lesson:f}).catch(()=>{});
-      if(!silent)toast('✅ 教材を更新しました（'+r.lessons.filter(x=>!x.deleted).length+'件）');render()}
-    else if(!silent)toast('シートに教材がありません。「全教材をシートへ保存」を押してください');
+    if(!r.ok)throw 0;
+    const {c,missing,missingLv}=mergeCurriculum(r);
+    S.set('kj_curriculum',c);
+    if(missing.length||missingLv.length)post({action:'saveAll',levels:missingLv,lessons:missing}).catch(()=>{});   // シートに無い分を書き足す
+    if(!silent)toast('✅ 教材を更新しました（'+c.lessons.filter(x=>!x.deleted).length+'件'+(missing.length?'・シートへ'+missing.length+'件書き足し':'')+'）');
+    render();
   }catch(e){if(!silent)toast('⚠ 教材を読み込めませんでした')}
 }
 
@@ -483,7 +507,7 @@ function Settings(){
   <div class="card"><h2>📄 GAS（シート・翻訳・LINE）</h2><input id="gas" value="${esc(S.get('kj_gas',''))}" placeholder="https://script.google.com/macros/s/.../exec"></div>
   <button class="btn" onclick="saveSettings()">設定を保存</button>
   <div class="card" style="margin-top:12px"><button class="btn warn" onclick="if(confirm('この端末の学習記録を消しますか？（シートは消えません）')){S.set('kj_records',[]);toast('消去しました')}">この端末の学習記録を消す</button>
-  <p class="small">${APP_VER}　入力欄の改良・指示の自動付与</p></div>`;
+  <p class="small">${APP_VER}　教材が消える不具合を修正</p></div>`;
 }
 function saveSettings(){
   S.set('kj_eval',$('ev').value.trim());S.set('kj_pin',$('pin').value.trim());S.set('kj_gas',$('gas').value.trim());
