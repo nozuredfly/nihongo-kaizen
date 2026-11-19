@@ -154,6 +154,10 @@ function speakSeq(seq){
   if(speechSynthesis.speaking||speechSynthesis.pending){speechSynthesis.cancel();setTimeout(run,250)}else run();
 }
 function speak(t,lang='ja'){speakSeq([{t,lang}])}
+function unlockAudio(){   // iPhoneは最初のタップで一度鳴らさないと音が出ないことがある
+  if(audioUnlocked||!('speechSynthesis'in window))return;audioUnlocked=true;
+  try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u)}catch(e){}
+}
 function voiceTest(){
   pickVoice();
   const n=speechSynthesis?speechSynthesis.getVoices().length:0;
