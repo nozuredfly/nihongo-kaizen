@@ -136,33 +136,24 @@ function playScene(x){
   seq.push({t:promptId(x),lang:'id'});
   speakSeq(seq);
 }
+function mkUtter(t,lang){
+  const u=new SpeechSynthesisUtterance(t);
+  if(lang==='id'){u.lang='id-ID';u.rate=.9;if(ID_VOICE)u.voice=ID_VOICE}
+  else{u.lang='ja-JP';u.rate=.85;if(JA_VOICE)u.voice=JA_VOICE}
+  u.volume=1;u.pitch=1;
+  u.onerror=e=>{if(e.error!=='interrupted'&&e.error!=='canceled')toast((lang==='id'?'インドネシア語':'日本語')+'の音声エラー：'+e.error)};
+  return u;
+}
+/* 複数の文を一度にまとめて予約（iPhoneはタップ直後に予約しないと鳴らない） */
 function speakSeq(seq){
-  if(!('speechSynthesis'in window)||!seq.length)return;
-  speechSynthesis.cancel();
-  let i=0;
-  const next=()=>{if(i>=seq.length)return;const s=seq[i++];speak(s.t,s.lang,()=>setTimeout(next,400),true)};
-  setTimeout(next,150);
-}
-function unlockAudio(){   // iPhoneは最初のタップで一度鳴らさないと音が出ないことがある
-  if(audioUnlocked||!('speechSynthesis'in window))return;audioUnlocked=true;
-  try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u)}catch(e){}
-}
-function speak(t,lang='ja',onend,inSeq){
-  if(!t)return;
   if(!('speechSynthesis'in window))return toast('この端末は音声に対応していません');
+  seq=seq.filter(s=>s.t);if(!seq.length)return;
   if(!JA_VOICE||!ID_VOICE)pickVoice();
-  const go=()=>{
-    const u=new SpeechSynthesisUtterance(t);
-    if(lang==='id'){u.lang='id-ID';u.rate=.9;if(ID_VOICE)u.voice=ID_VOICE}
-    else{u.lang='ja-JP';u.rate=.85;if(JA_VOICE)u.voice=JA_VOICE}
-    u.volume=1;u.pitch=1;
-    u.onend=()=>onend&&onend();
-    u.onerror=e=>{if(e.error!=='interrupted'&&e.error!=='canceled')toast('音声エラー：'+e.error);onend&&onend()};
-    speechSynthesis.resume();speechSynthesis.speak(u);
-    window._u=u;   // 途中で消されないように保持（Chrome対策）
-  };
-  if(!inSeq&&(speechSynthesis.speaking||speechSynthesis.pending)){speechSynthesis.cancel();setTimeout(go,150)}else go();
+  if(seq.some(s=>s.lang==='id')&&!ID_VOICE)toast('インドネシア語の声が端末にありません（⚙の音声テストで確認）');
+  const run=()=>{speechSynthesis.resume();window._uq=seq.map(s=>{const u=mkUtter(s.t,s.lang);speechSynthesis.speak(u);return u})};
+  if(speechSynthesis.speaking||speechSynthesis.pending){speechSynthesis.cancel();setTimeout(run,250)}else run();
 }
+function speak(t,lang='ja'){speakSeq([{t,lang}])}
 function voiceTest(){
   pickVoice();
   const n=speechSynthesis?speechSynthesis.getVoices().length:0;
@@ -209,7 +200,8 @@ function addStudent(){const v=($('newName').value||'').trim();if(!v)return;
   const ss=students();if(!ss.includes(v))ss.push(v);S.set('kj_students',ss);S.set('kj_cur',v);render()}
 
 /* ===== レッスン ===== */
-function openLesson(key){st.key=key;st.stars=0;go('lesson')}
+function openLesson(key){st.key=key;st.stars=0;go('lesson');
+  if(S.get('kj_autoplay',true))playScene(lessonBy(key))}   // 開いたら自動で「日本語→インドネシア語の指示」
 function Lesson(){
   const x=lessonBy(st.key),nm=curName(),n=count(nm,x.key),done=n>=LIMIT;
   const ls=lessonsOf(x.lv),i=ls.findIndex(l=>l.key===x.key);
@@ -217,11 +209,13 @@ function Lesson(){
   <div class="card"><div class="id">Level ${x.lv} — ${i+1}/${ls.length}</div>
   <h2>${esc(x.icon)} ${esc(x.title)} <span class="id">/ ${esc(x.title_id)}</span></h2>
   <div class="id">📍 ${esc(x.scene)}<br>${esc(x.scene_id)}</div></div>
-  <div class="card"><span class="step">① 日本人 / Orang Jepang</span>`;
-  h+=x.boss?`<div class="boss"><div class="jp">「${esc(x.boss)}」</div><div class="idtx">🇮🇩 ${esc(x.boss_id)}</div>${spk(x.boss,'🔊 音声')}</div>`
+  <button class="btn blue" onclick="playScene(lessonBy(st.key))">▶ 再生 / Putar（日本語 → 🇮🇩 指示）</button>
+  <div class="card" style="margin-top:12px"><span class="step">① 日本人 / Orang Jepang</span>`;
+  h+=x.boss?`<div class="boss"><div class="jp">「${esc(x.boss)}」</div><div class="idtx">🇮🇩 ${esc(x.boss_id)}</div>${spk(x.boss,'🔊 日本語')}</div>`
     :`<div class="boss"><div class="idtx">研修生から先に話します。<br>🇮🇩 Anda yang bicara duluan.</div></div>`;
   h+=`<div style="margin-top:12px"><span class="step">② 研修生 / Peserta</span>
-  <div class="reply"><div class="idtx" style="margin:0 0 6px"><b>日本語で言ってください。</b><br>Silakan ucapkan dalam bahasa Jepang.</div>
+  <div class="reply"><div class="idtx" style="margin:0 0 6px"><b>🇮🇩 ${esc(promptId(x))}</b><br><span class="small">（日本語で${x.boss?'答えて':'聞いて'}ください）</span>
+    <button class="spk" data-t="${esc(promptId(x))}" onclick="speak(this.dataset.t,'id')">🔊 Indonesia</button></div>
     <div class="jp">「${esc(x.reply)}」</div><div class="kana">${esc(x.kana)}</div>
     <div class="romaji">${esc(x.romaji)}</div><div class="idtx">🇮🇩 ${esc(x.reply_id)}</div>${spk(x.reply,'🔊 お手本 / Contoh')}</div></div></div>
   <div class="card"><span class="step">③ 採点 / Nilai</span>`;
@@ -330,14 +324,15 @@ function LessonEdit(){
   ${f('boss','日本人の言葉（研修生から話す場合は空欄）','例：田んぼの水を見てきてください。')}
   ${f('reply','研修生の言葉','例：はい、分かりました。見てきます。')}
   ${f('kana','よみがな（任意・ひらがな）','例：はい、わかりました。みてきます')}
+  ${f('prompt','研修生への指示（任意・空欄なら「日本語で答えてください」）','例：日本語でくり返してください')}
   <button class="btn blue" id="trBtn" onclick="autoTranslate()">🌐 インドネシア語に自動翻訳</button></div>
   <div class="card"><span class="step">インドネシア語（自動・手直しOK）</span>
-  ${f('title_id','課題名')}${f('scene_id','場面')}${f('boss_id','日本人の言葉')}${f('reply_id','研修生の言葉')}${f('romaji','ローマ字（よみがなから自動）')}</div>
+  ${f('title_id','課題名')}${f('scene_id','場面')}${f('boss_id','日本人の言葉')}${f('reply_id','研修生の言葉')}${f('prompt_id','研修生への指示（音声で流れます）')}${f('romaji','ローマ字（よみがなから自動）')}</div>
   <button class="btn" onclick="saveLesson()">💾 保存</button>
   ${st.editKey?`<button class="btn warn" onclick="deleteLesson()">この言葉を削除</button>`:''}`;
 }
 async function autoTranslate(){
-  const ids=['title','scene','boss','reply'],texts=ids.map(i=>$('f_'+i).value.trim());
+  const ids=['title','scene','boss','reply','prompt'],texts=ids.map(i=>$('f_'+i).value.trim());
   const kana=$('f_kana').value.trim();if(kana&&!$('f_romaji').value)$('f_romaji').value=toRomaji(kana);
   if(!hasGas())return toast('自動翻訳にはGASの設定が必要です');
   const b=$('trBtn');b.disabled=true;b.textContent='翻訳中…';
@@ -353,7 +348,7 @@ async function saveLesson(){
   const lv=old?old.lv:st.editLv,maxO=Math.max(0,...lessonsOf(lv).map(x=>+x.order||0));
   const x={...(old||{}),key:old?old.key:'L'+lv+'-'+Date.now().toString(36),lv,order:old?old.order:maxO+1,
     icon:v('icon')||'🌾',title:v('title'),title_id:v('title_id'),scene:v('scene'),scene_id:v('scene_id'),
-    boss:v('boss'),boss_id:v('boss_id'),reply:v('reply'),kana:v('kana'),romaji:v('romaji')||(v('kana')?toRomaji(v('kana')):''),reply_id:v('reply_id'),
+    boss:v('boss'),boss_id:v('boss_id'),reply:v('reply'),kana:v('kana'),romaji:v('romaji')||(v('kana')?toRomaji(v('kana')):''),reply_id:v('reply_id'),prompt:v('prompt'),prompt_id:v('prompt_id'),
     author:S.get('kj_eval',''),updated:today()};
   if(!x.reply_id&&hasGas()&&!confirm('インドネシア語が空です。このまま保存しますか？'))return;
   c.lessons=c.lessons.filter(l=>l.key!==x.key).concat(x);S.set('kj_curriculum',c);
@@ -446,13 +441,15 @@ function Settings(){
   $app().innerHTML=`<div class="card"><h2>👥 研修生</h2><p class="small">LINEで「登録 名前」と送ってもらう名前と同じにしてください。</p>
   ${ss.map((s,i)=>`<div class="row" style="margin-bottom:6px"><span>${esc(s)}</span><button class="btn sub sm" style="flex:0 0 80px" onclick="delStudent(${i})">削除</button></div>`).join('')}
   <input id="newName" placeholder="名前を追加"><button class="btn" onclick="addStudent();go('settings')">追加</button></div>
-  <div class="card"><h2>🔊 音声テスト</h2><button class="btn blue" onclick="voiceTest()">音声を鳴らしてみる</button><p class="small" id="vinfo"></p></div>
+  <div class="card"><h2>🔊 音声テスト</h2><button class="btn blue" onclick="voiceTest()">日本語 → インドネシア語を続けて鳴らす</button>
+  <div class="row" style="margin-top:8px"><button class="btn sub sm" onclick="speak('おはようございます','ja')">🇯🇵 日本語だけ</button><button class="btn sub sm" onclick="speak('Selamat pagi. Silakan ucapkan dalam bahasa Jepang.','id')">🇮🇩 インドネシア語だけ</button></div><p class="small" id="vinfo"></p>
+  <label><input type="checkbox" style="width:auto" ${S.get('kj_autoplay',true)?'checked':''} onchange="S.set('kj_autoplay',this.checked)"> 課題を開いたら自動で再生する</label></div>
   <div class="card"><h2>🧑‍💼 評価者（日本人）の名前</h2><input id="ev" value="${esc(S.get('kj_eval',''))}" placeholder="例: 野副"></div>
   <div class="card"><h2>🔐 管理者の暗証番号</h2><p class="small">教材編集と設定を開くときに聞きます（空欄なら聞きません）。</p><input id="pin" type="password" inputmode="numeric" value="${esc(S.get('kj_pin',''))}"></div>
   <div class="card"><h2>📄 GAS（シート・翻訳・LINE）</h2><input id="gas" value="${esc(S.get('kj_gas',''))}" placeholder="https://script.google.com/macros/s/.../exec"></div>
   <button class="btn" onclick="saveSettings()">設定を保存</button>
   <div class="card" style="margin-top:12px"><button class="btn warn" onclick="if(confirm('この端末の学習記録を消しますか？（シートは消えません）')){S.set('kj_records',[]);toast('消去しました')}">この端末の学習記録を消す</button>
-  <p class="small">v1.2.1　音声の不具合対策・音声テスト追加</p></div>`;
+  <p class="small">v1.3.1　続けて再生の不具合を修正</p></div>`;
 }
 function saveSettings(){
   S.set('kj_eval',$('ev').value.trim());S.set('kj_pin',$('pin').value.trim());S.set('kj_gas',$('gas').value.trim());
