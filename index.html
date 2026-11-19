@@ -95,7 +95,14 @@ const LIMIT=3;   // 1つの言葉の記録は3回まで（3回でクリア）
 /* ===== 保存 ===== */
 const S={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch(e){return d}},
          set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){toast('保存できませんでした')}}};
-const CUR=()=>S.get('kj_curriculum',DEFAULT);
+const APP_VER='v1.3.4';
+/* 5番「仕事の始まり」に日本人の言葉が無い古い教材を自動で直す（シートから読んだ時も） */
+function fixCurriculum(c){
+  let fixed=null;const x=c.lessons.find(l=>l.key==='L1-05');
+  if(x&&!String(x.boss||'').trim()){Object.assign(x,DEFAULT.lessons.find(l=>l.key==='L1-05'),{updated:today()});fixed=x}
+  return fixed;
+}
+const CUR=()=>{const c=S.get('kj_curriculum',DEFAULT);const f=fixCurriculum(c);if(f&&c!==DEFAULT)localStorage.setItem('kj_curriculum',JSON.stringify(c));return c};
 const levels=()=>CUR().levels.slice().sort((a,b)=>a.lv-b.lv);
 const lessonsOf=lv=>CUR().lessons.filter(x=>+x.lv===+lv&&!x.deleted).sort((a,b)=>a.order-b.order);
 const lessonBy=key=>CUR().lessons.find(x=>x.key===key);
@@ -198,6 +205,7 @@ function Home(){
       <div class="t"><b>${i+1}. ${esc(x.title)}</b><span class="id">${esc(x.title_id)}</span></div>
       <div class="dots">${n>=LIMIT?'🏆':''}<br>${'●'.repeat(n)}${'○'.repeat(LIMIT-n)}</div></div>`});
   });
+  h+=`<p class="small" style="text-align:center">${APP_VER}</p>`;
   $app().innerHTML=h;
 }
 function addStudent(){const v=($('newName').value||'').trim();if(!v)return;
@@ -290,7 +298,7 @@ async function sendLine(){
 async function loadCurriculum(silent){
   if(!hasGas())return silent||toast('⚙設定でGASのURLを入れてください');
   try{const r=await post({action:'getLessons'},true);
-    if(r.ok&&r.lessons&&r.lessons.length){S.set('kj_curriculum',{levels:r.levels.length?r.levels:CUR().levels,lessons:r.lessons});
+    if(r.ok&&r.lessons&&r.lessons.length){const c={levels:r.levels.length?r.levels:CUR().levels,lessons:r.lessons};const f=fixCurriculum(c);S.set('kj_curriculum',c);if(f)post({action:'saveLesson',lesson:f}).catch(()=>{});
       if(!silent)toast('✅ 教材を更新しました（'+r.lessons.filter(x=>!x.deleted).length+'件）');render()}
     else if(!silent)toast('シートに教材がありません。「全教材をシートへ保存」を押してください');
   }catch(e){if(!silent)toast('⚠ 教材を読み込めませんでした')}
@@ -453,22 +461,13 @@ function Settings(){
   <div class="card"><h2>📄 GAS（シート・翻訳・LINE）</h2><input id="gas" value="${esc(S.get('kj_gas',''))}" placeholder="https://script.google.com/macros/s/.../exec"></div>
   <button class="btn" onclick="saveSettings()">設定を保存</button>
   <div class="card" style="margin-top:12px"><button class="btn warn" onclick="if(confirm('この端末の学習記録を消しますか？（シートは消えません）')){S.set('kj_records',[]);toast('消去しました')}">この端末の学習記録を消す</button>
-  <p class="small">v1.3.3　5番に「仕事が始まります。」を追加</p></div>`;
+  <p class="small">${APP_VER}　5番の自動修正</p></div>`;
 }
 function saveSettings(){
   S.set('kj_eval',$('ev').value.trim());S.set('kj_pin',$('pin').value.trim());S.set('kj_gas',$('gas').value.trim());
   toast('保存しました');loadCurriculum(true)}
 function delStudent(i){const ss=students(),n=ss.splice(i,1)[0];S.set('kj_students',ss);if(curName()===n)S.set('kj_cur',ss[0]||'');go('settings')}
 
-/* 一回だけの修正：5番「仕事の始まり」に日本人の言葉を追加（保存済みの教材にも反映） */
-(function(){
-  if(S.get('kj_patch_l105',false))return;
-  const c=S.get('kj_curriculum',null);
-  if(c){const x=c.lessons.find(l=>l.key==='L1-05');
-    if(x&&!x.boss){Object.assign(x,DEFAULT.lessons.find(l=>l.key==='L1-05'),{updated:today()});S.set('kj_curriculum',c);
-      if(hasGas())post({action:'saveLesson',lesson:x}).catch(()=>{});}}
-  S.set('kj_patch_l105',true);
-})();
 render();
 loadCurriculum(true);   // 起動時にシートの最新教材を読み込む
 </script>
