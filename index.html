@@ -120,34 +120,55 @@ const cleared=(name,key)=>count(name,key)>=LIMIT;
 const lvDone=(name,lv)=>{const ls=lessonsOf(lv);return ls.length>0&&ls.every(x=>cleared(name,x.key))};
 function lvOpen(name,lv){const ls=levels();const i=ls.findIndex(l=>l.lv===lv);return i<=0||lvDone(name,ls[i-1].lv)}
 /* ===== 音声（iPhone・Android対策版） ===== */
-let JA_VOICE=null,audioUnlocked=false;
+let JA_VOICE=null,ID_VOICE=null,audioUnlocked=false;
 function pickVoice(){
   if(!('speechSynthesis'in window))return;
   const vs=speechSynthesis.getVoices();
   JA_VOICE=vs.find(v=>v.lang==='ja-JP'&&/Kyoko|O-ren|Google|Hattori/i.test(v.name))||vs.find(v=>/^ja/i.test(v.lang))||null;
+  ID_VOICE=vs.find(v=>/^(id|in)[-_]/i.test(v.lang)&&/Damayanti|Google/i.test(v.name))||vs.find(v=>/^(id|in)([-_]|$)/i.test(v.lang))||null;
+}
+/* 研修生への指示（インドネシア語の音声） */
+const promptId=x=>x.prompt_id||(x.boss?'Silakan jawab dalam bahasa Jepang.':'Silakan bertanya dalam bahasa Jepang.');
+/* 日本人の言葉（日本語）→ 指示（インドネシア語）を続けて再生 */
+function playScene(x){
+  const seq=[];
+  if(x.boss)seq.push({t:x.boss,lang:'ja'});
+  seq.push({t:promptId(x),lang:'id'});
+  speakSeq(seq);
+}
+function speakSeq(seq){
+  if(!('speechSynthesis'in window)||!seq.length)return;
+  speechSynthesis.cancel();
+  let i=0;
+  const next=()=>{if(i>=seq.length)return;const s=seq[i++];speak(s.t,s.lang,()=>setTimeout(next,400),true)};
+  setTimeout(next,150);
 }
 function unlockAudio(){   // iPhoneは最初のタップで一度鳴らさないと音が出ないことがある
   if(audioUnlocked||!('speechSynthesis'in window))return;audioUnlocked=true;
   try{const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u)}catch(e){}
 }
-function speak(t){
+function speak(t,lang='ja',onend,inSeq){
   if(!t)return;
   if(!('speechSynthesis'in window))return toast('この端末は音声に対応していません');
-  if(!JA_VOICE)pickVoice();
+  if(!JA_VOICE||!ID_VOICE)pickVoice();
   const go=()=>{
-    const u=new SpeechSynthesisUtterance(t);u.lang='ja-JP';u.rate=.85;u.volume=1;u.pitch=1;
-    if(JA_VOICE)u.voice=JA_VOICE;
-    u.onerror=e=>{if(e.error!=='interrupted'&&e.error!=='canceled')toast('音声エラー：'+e.error)};
+    const u=new SpeechSynthesisUtterance(t);
+    if(lang==='id'){u.lang='id-ID';u.rate=.9;if(ID_VOICE)u.voice=ID_VOICE}
+    else{u.lang='ja-JP';u.rate=.85;if(JA_VOICE)u.voice=JA_VOICE}
+    u.volume=1;u.pitch=1;
+    u.onend=()=>onend&&onend();
+    u.onerror=e=>{if(e.error!=='interrupted'&&e.error!=='canceled')toast('音声エラー：'+e.error);onend&&onend()};
     speechSynthesis.resume();speechSynthesis.speak(u);
     window._u=u;   // 途中で消されないように保持（Chrome対策）
   };
-  if(speechSynthesis.speaking||speechSynthesis.pending){speechSynthesis.cancel();setTimeout(go,150)}else go();
+  if(!inSeq&&(speechSynthesis.speaking||speechSynthesis.pending)){speechSynthesis.cancel();setTimeout(go,150)}else go();
 }
 function voiceTest(){
   pickVoice();
   const n=speechSynthesis?speechSynthesis.getVoices().length:0;
-  $('vinfo').innerHTML=`音声の数：${n}　日本語の声：${JA_VOICE?esc(JA_VOICE.name):'<b style="color:#c0392b">見つかりません</b>'}`;
-  speak('おはようございます。音声のテストです。');
+  const ng='<b style="color:#c0392b">見つかりません</b>';
+  $('vinfo').innerHTML=`音声の数：${n}<br>日本語の声：${JA_VOICE?esc(JA_VOICE.name):ng}<br>インドネシア語の声：${ID_VOICE?esc(ID_VOICE.name):ng}`;
+  speakSeq([{t:'おはようございます。音声のテストです。',lang:'ja'},{t:'Silakan ucapkan dalam bahasa Jepang.',lang:'id'}]);
 }
 if('speechSynthesis'in window){pickVoice();speechSynthesis.onvoiceschanged=pickVoice}
 document.addEventListener('touchend',unlockAudio,{once:true});
