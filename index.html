@@ -87,7 +87,7 @@ const DEFAULT={levels:[
   {key:"L1-02",lv:1,order:2,icon:"🌇",title:"帰りのあいさつ",title_id:"Salam pulang kerja",scene:"仕事が終わって帰るとき",scene_id:"Pekerjaan selesai, waktunya pulang.",boss:"お疲れ様でした。",boss_id:"Terima kasih atas kerja kerasnya.",reply:"お疲れ様でした。",kana:"おつかれさまでした",romaji:"Otsukaresama deshita.",reply_id:"Terima kasih atas kerja kerasnya."},
   {key:"L1-03",lv:1,order:3,icon:"☕",title:"休憩の指示",title_id:"Perintah istirahat",scene:"休憩の時間",scene_id:"Waktu istirahat.",boss:"休憩です。",boss_id:"Sekarang istirahat.",reply:"はい、分かりました。",kana:"はい、わかりました",romaji:"Hai, wakarimashita.",reply_id:"Ya, saya mengerti."},
   {key:"L1-04",lv:1,order:4,icon:"🍙",title:"お昼休憩の指示",title_id:"Perintah istirahat siang",scene:"お昼の時間",scene_id:"Waktu makan siang.",boss:"お昼休憩です。",boss_id:"Sekarang istirahat siang.",reply:"はい、分かりました。",kana:"はい、わかりました",romaji:"Hai, wakarimashita.",reply_id:"Ya, saya mengerti."},
-  {key:"L1-05",lv:1,order:5,icon:"🧑‍🌾",title:"仕事の始まり",title_id:"Awal kerja",scene:"朝、仕事の前（研修生から聞く）",scene_id:"Pagi, sebelum kerja. Anda yang bertanya duluan.",boss:"",boss_id:"",reply:"今日の仕事は何ですか？",kana:"きょうのしごとはなんですか",romaji:"Kyō no shigoto wa nan desu ka?",reply_id:"Apa pekerjaan hari ini?"},
+  {key:"L1-05",lv:1,order:5,icon:"🧑‍🌾",title:"仕事の始まり",title_id:"Awal kerja",scene:"朝、仕事が始まるとき",scene_id:"Pagi, saat pekerjaan akan dimulai.",boss:"仕事が始まります。",boss_id:"Pekerjaan akan dimulai.",prompt:"今日の仕事を日本語で聞いてください。",prompt_id:"Silakan tanyakan pekerjaan hari ini dalam bahasa Jepang.",reply:"今日の仕事は何ですか？",kana:"きょうのしごとはなんですか",romaji:"Kyō no shigoto wa nan desu ka?",reply_id:"Apa pekerjaan hari ini?"},
   {key:"L1-06",lv:1,order:6,icon:"🧹",title:"仕事の終わり",title_id:"Akhir kerja",scene:"今日の仕事が終わったとき",scene_id:"Saat pekerjaan hari ini selesai.",boss:"今日の仕事は終わりました。",boss_id:"Pekerjaan hari ini sudah selesai.",reply:"はい、分かりました。後片付けをします。",kana:"はい、わかりました。あとかたづけをします",romaji:"Hai, wakarimashita. Atokatazuke o shimasu.",reply_id:"Ya, saya mengerti. Saya akan beres-beres."}
  ]};
 const LIMIT=3;   // 1つの言葉の記録は3回まで（3回でクリア）
@@ -453,13 +453,22 @@ function Settings(){
   <div class="card"><h2>📄 GAS（シート・翻訳・LINE）</h2><input id="gas" value="${esc(S.get('kj_gas',''))}" placeholder="https://script.google.com/macros/s/.../exec"></div>
   <button class="btn" onclick="saveSettings()">設定を保存</button>
   <div class="card" style="margin-top:12px"><button class="btn warn" onclick="if(confirm('この端末の学習記録を消しますか？（シートは消えません）')){S.set('kj_records',[]);toast('消去しました')}">この端末の学習記録を消す</button>
-  <p class="small">v1.3.1　続けて再生の不具合を修正</p></div>`;
+  <p class="small">v1.3.3　5番に「仕事が始まります。」を追加</p></div>`;
 }
 function saveSettings(){
   S.set('kj_eval',$('ev').value.trim());S.set('kj_pin',$('pin').value.trim());S.set('kj_gas',$('gas').value.trim());
   toast('保存しました');loadCurriculum(true)}
 function delStudent(i){const ss=students(),n=ss.splice(i,1)[0];S.set('kj_students',ss);if(curName()===n)S.set('kj_cur',ss[0]||'');go('settings')}
 
+/* 一回だけの修正：5番「仕事の始まり」に日本人の言葉を追加（保存済みの教材にも反映） */
+(function(){
+  if(S.get('kj_patch_l105',false))return;
+  const c=S.get('kj_curriculum',null);
+  if(c){const x=c.lessons.find(l=>l.key==='L1-05');
+    if(x&&!x.boss){Object.assign(x,DEFAULT.lessons.find(l=>l.key==='L1-05'),{updated:today()});S.set('kj_curriculum',c);
+      if(hasGas())post({action:'saveLesson',lesson:x}).catch(()=>{});}}
+  S.set('kj_patch_l105',true);
+})();
 render();
 loadCurriculum(true);   // 起動時にシートの最新教材を読み込む
 </script>
