@@ -106,7 +106,7 @@ const LIMIT=3;   // 合格（理解○＋行動✓）を3回でクリア。ク�
 /* ===== 保存 ===== */
 const S={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch(e){return d}},
          set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){toast('保存できませんでした')}}};
-const APP_VER='v2.1';
+const APP_VER='v2.2';
 /* 5番「仕事の始まり」に日本人の言葉が無い古い教材を自動で直す（シートから読んだ時も） */
 function fixCurriculum(c){
   let fixed=null;const x=c.lessons.find(l=>l.key==='L1-05');
@@ -150,7 +150,8 @@ function makeOpts(x){
 }
 const cleared=(name,key)=>count(name,key)>=LIMIT;
 const lvDone=(name,lv)=>{const ls=lessonsOf(lv);return ls.length>0&&ls.every(x=>cleared(name,x.key))};
-function lvOpen(name,lv){if(S.get('kj_openall',false))return true;const ls=levels();const i=ls.findIndex(l=>l.lv===lv);return i<=0||lvDone(name,ls[i-1].lv)}
+function lvOpen(name,lv){if(!S.get('kj_lock',false))return true;   // ふだんは鍵なし（現場の指示はレベルを待てない）
+  const ls=levels();const i=ls.findIndex(l=>l.lv===lv);return i<=0||lvDone(name,ls[i-1].lv)}
 /* ===== 音声（iPhone・Android対策版） ===== */
 let JA_VOICE=null,ID_VOICE=null,audioUnlocked=false;
 function pickVoice(){
@@ -232,7 +233,7 @@ function Home(){
     if(!ls.length){h+=`<p class="small">教材は準備中です / Materi segera hadir.</p></div>`;return}
     const c=ls.filter(x=>cleared(nm,x.key)).length;
     h+=`<div class="lvbar"><i style="width:${c/ls.length*100}%"></i></div><div class="small">クリア ${c} / ${ls.length}${c===ls.length?'　🎉 レベルクリア！':''}</div>
-    ${open?'':`<p class="small">🔒 前のレベルをクリアすると開きます（言葉${ls.length}件）<br>確認したいときは ⚙ →「全レベルを開く」</p>`}</div>`;
+    ${open?'':`<p class="small">🔒 前のレベルをクリアすると開きます（言葉${ls.length}件）<br>鍵を外すときは ⚙ →「レベルの鍵」をオフ</p>`}</div>`;
     if(open)ls.forEach((x,i)=>{const n=Math.min(count(nm,x.key),LIMIT);
       h+=`<div class="lesson" onclick="openLesson('${x.key}')"><div class="ic">${esc(x.icon)}</div>
       <div class="t"><b>${i+1}. ${esc(x.title)}</b><span class="id">${esc(x.title_id)}</span></div>
@@ -760,14 +761,14 @@ function Settings(){
   <label><input type="radio" name="md" style="width:auto" ${detailMode()?'checked':''} onchange="S.set('kj_detail',true)"> くわしく：★・意味の3択・作業の確認</label>
   <label style="margin-left:22px"><input type="checkbox" style="width:auto" ${S.get('kj_check',true)?'checked':''} onchange="S.set('kj_check',this.checked)"> くわしくの時、意味の3択を使う</label>
   <p class="small">ふだんは「かんたん」で現場の時間を取らない。新しい作業や安全の言葉をじっくり教える時だけ「くわしく」。</p></div>
-  <div class="card"><h2>🔓 レベルの鍵</h2><label><input type="checkbox" style="width:auto" ${S.get('kj_openall',false)?'checked':''} onchange="S.set('kj_openall',this.checked);toast(this.checked?'全レベルを開きました':'鍵を元に戻しました')"> 全レベルを開く（教材の確認用・上級の研修生用）</label>
-  <p class="small">ふだんはオフ。オフのときは前のレベルをクリアすると次が開きます。</p></div>
+  <div class="card"><h2>🔒 レベルの鍵（任意）</h2><label><input type="checkbox" style="width:auto" ${S.get('kj_lock',false)?'checked':''} onchange="S.set('kj_lock',this.checked);toast(this.checked?'鍵をかけました':'全レベルを開きました')"> 前のレベルをクリアするまで、次のレベルに鍵をかける</label>
+  <p class="small">ふだんはオフ（全レベル使える）。現場の指示はレベルを待てないため。レベルは「どこまで身についたか」の目安として使います。</p></div>
   <div class="card"><h2>🧑‍💼 評価者（日本人）の名前</h2><input id="ev" value="${esc(S.get('kj_eval',''))}" placeholder="例: 野副"></div>
   <div class="card"><h2>🔐 管理者の暗証番号</h2><p class="small">教材編集と設定を開くときに聞きます（空欄なら聞きません）。</p><input id="pin" type="password" inputmode="numeric" value="${esc(S.get('kj_pin',''))}"></div>
   <div class="card"><h2>📄 GAS（シート・翻訳・LINE）</h2><input id="gas" value="${esc(S.get('kj_gas',''))}" placeholder="https://script.google.com/macros/s/.../exec"></div>
   <button class="btn" onclick="saveSettings()">設定を保存</button>
   <div class="card" style="margin-top:12px"><button class="btn warn" onclick="if(confirm('この端末の学習記録を消しますか？（シートは消えません）')){S.set('kj_records',[]);toast('消去しました')}">この端末の学習記録を消す</button>
-  <p class="small">${APP_VER}　分からない時のインドネシア語ボタン</p></div>`;
+  <p class="small">${APP_VER}　レベルの鍵を外す（全レベル使える）</p></div>`;
 }
 function saveSettings(){
   S.set('kj_eval',$('ev').value.trim());S.set('kj_pin',$('pin').value.trim());S.set('kj_gas',$('gas').value.trim());
