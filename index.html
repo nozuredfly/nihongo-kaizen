@@ -71,6 +71,7 @@ td,th{border-bottom:1px solid #e3e8e5;padding:6px 4px;text-align:left;vertical-a
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
 .chip{display:inline-flex;align-items:center;gap:4px;border:2px solid #cfd8d2;border-radius:20px;padding:7px 12px;font-size:15px;background:#fff;color:var(--tx)}
 .chip input{width:auto;margin:0}.chip.on{border-color:var(--g);background:var(--g2);color:var(--g);font-weight:bold}
+.help{display:block;width:100%;margin-top:8px;border:2px dashed #2d6cdf;background:#eef3fd;color:#2d6cdf;border-radius:12px;padding:10px;font-size:15px;font-weight:bold;text-align:left}
 .mini{border:0;background:var(--g2);color:var(--g);border-radius:8px;padding:8px 10px;font-size:14px}
 </style>
 </head>
@@ -105,7 +106,7 @@ const LIMIT=3;   // 合格（理解○＋行動✓）を3回でクリア。ク�
 /* ===== 保存 ===== */
 const S={get(k,d){try{const v=JSON.parse(localStorage.getItem(k));return v??d}catch(e){return d}},
          set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){toast('保存できませんでした')}}};
-const APP_VER='v2.0';
+const APP_VER='v2.1';
 /* 5番「仕事の始まり」に日本人の言葉が無い古い教材を自動で直す（シートから読んだ時も） */
 function fixCurriculum(c){
   let fixed=null;const x=c.lessons.find(l=>l.key==='L1-05');
@@ -255,7 +256,8 @@ function Lesson(){
   <div class="id">📍 ${esc(x.scene)}<br>${esc(x.scene_id)}</div></div>
   <button class="btn blue" onclick="playScene(lessonBy(st.key))">▶ 再生 / Putar</button>
   <div class="card" style="margin-top:12px"><span class="step">① 聞く / Dengar</span>`;
-  h+=x.boss?`<div class="boss"><div class="jp">「${esc(x.boss)}」</div>${chk&&!answered?'':`<div class="idtx">🇮🇩 ${esc(x.boss_id)}</div>`}${spk(x.boss,'🔊 日本語')}</div>`
+  h+=x.boss?`<div class="boss"><div class="jp">「${esc(x.boss)}」</div>${chk&&!answered?'':`<div class="idtx">🇮🇩 ${esc(x.boss_id)}</div>`}${spk(x.boss,'🔊 日本語')}
+    ${x.boss_id&&!(chk&&!answered)?`<button class="help" data-t="${esc(x.boss_id)}" onclick="speak(this.dataset.t,'id')">🇮🇩 分からない時：意味をインドネシア語で聞く</button>`:''}</div>`
     :`<div class="boss"><div class="idtx">研修生から先に話します。<br>🇮🇩 Anda yang bicara duluan.</div></div>`;
   if(chk){
     h+=`<div style="margin-top:12px"><span class="step">② わかる / Paham?</span>
@@ -270,7 +272,8 @@ function Lesson(){
   <div class="reply"><div class="idtx" style="margin:0 0 6px"><b>🇮🇩 ${esc(promptId(x))}</b><br><span class="small">（${esc(promptJa(x))}）</span>
     <button class="spk" data-t="${esc(promptId(x))}" onclick="speak(this.dataset.t,'id')">🔊 Indonesia</button></div>
     <div class="jp">「${esc(x.reply)}」</div><div class="kana">${esc(x.kana)}</div>
-    <div class="romaji">${esc(x.romaji)}</div><div class="idtx">🇮🇩 ${esc(x.reply_id)}</div>${spk(x.reply,'🔊 お手本 / Contoh')}</div></div></div>`;
+    <div class="romaji">${esc(x.romaji)}</div><div class="idtx">🇮🇩 ${esc(x.reply_id)}</div>${spk(x.reply,'🔊 お手本 / Contoh')}
+    ${x.reply_id?`<button class="help" onclick="replyHint()">🇮🇩 言えない時：返事の意味を聞く → お手本</button>`:''}</div></div></div>`;
   if(done){h+=`<div class="card"><div class="clear">🏆 クリア済み / Sudah lulus</div>
     <p class="small" style="text-align:center">合格${LIMIT}回でクリアしました。記録はしません。会話練習として自由に使えます。<br>Sekarang bebas dipakai untuk latihan percakapan.</p></div>`}
   else if(!detailMode()){
@@ -292,6 +295,8 @@ function Lesson(){
   <button class="btn sub" ${i>=ls.length-1?'disabled':''} onclick="openLesson('${ls[i+1]?.key}')">次 ▶</button></div>`;
   $app().innerHTML=h;
 }
+/* 返事が言えない時：インドネシア語で意味 → 日本語のお手本 */
+function replyHint(){const x=lessonBy(st.key);speakSeq([{t:x.reply_id,lang:'id'},{t:x.reply,lang:'ja'}])}
 function pickOpt(k){
   const x=lessonBy(st.key);if(st.understood!==null)return;
   st.picked=st.opts[k];st.understood=st.picked===x.boss_id;Lesson();
@@ -440,7 +445,7 @@ function TaskRun(){
    ${st.showId?`<div class="idtx">🇮🇩 ${esc(t.id_text||'（訳なし）')}</div>`:''}
    <button class="spk" data-t="${esc(t.ja)}" onclick="speak(this.dataset.t,'ja')">🔊 読み上げ</button>
    <button class="spk" onclick="st.showId=!st.showId;TaskRun()">🇮🇩 ${st.showId?'隠す':'表示'}</button>
-   ${t.id_text?`<button class="spk" data-t="${esc(t.id_text)}" onclick="speak(this.dataset.t,'id')">🔊 Indonesia</button>`:''}</div>
+   ${t.id_text?`<button class="help" data-t="${esc(t.id_text)}" onclick="speak(this.dataset.t,'id')">🇮🇩 分からない時：指示をインドネシア語で聞く</button>`:''}</div>
   <div class="reply" style="margin-top:10px"><b>日本語で言ってください。</b><br><span class="idtx">🇮🇩 ${AUTO_ID}</span>
    <button class="spk" onclick="speak(AUTO_ID,'id')">🔊 流す</button></div></div>`;
   if(t.safety)h+=`<div class="card" style="border:2px solid #d9822b"><span class="step" style="background:#d9822b">🦺 安全確認</span>
@@ -451,6 +456,7 @@ function TaskRun(){
     <p class="small" style="margin:4px 0">「はい、分かりました」だけで進めず、要点を言えたか確認します。言えた要点をタップ。</p>
     <div class="chips">${(t.points.length?t.points:['作業名']).map(pt=>`<button class="chip ${st.tick.includes(pt)?'on':''}" onclick="tickPoint('${pt}')">${st.tick.includes(pt)?'✓ ':''}${pt}</button>`).join('')}</div>
     <button class="spk" onclick="st.showModel=!st.showModel;TaskRun()">👀 お手本を${st.showModel?'隠す':'見る'}</button>
+    ${t.id_text?`<button class="help" onclick="taskHint()">🇮🇩 言えない時：指示の意味 → ${t.model?'お手本':'日本語'}を流す</button>`:''}
     ${st.showModel?`<div class="reply" style="margin-top:8px">${t.model?`<div class="jp" style="font-size:18px">${esc(t.model)}</div>${spk(t.model,'🔊 お手本')}`:'<span class="small">お手本は未登録です</span>'}</div>`:''}
     <button class="btn big" onclick="reciteOk()">✅ 復唱OK</button>
     <button class="btn sub" onclick="reciteRetry()">🔁 もう一度${t.reciteTries?'（'+t.reciteTries+'回目）':''}</button></div>`;
@@ -466,6 +472,7 @@ function TaskRun(){
   h+=`<div class="small" style="margin-top:8px">${t.log.map(esc).join('<br>')}</div>`;
   $app().innerHTML=h;
 }
+function taskHint(){const t=taskBy(st.tid);speakSeq([{t:t.id_text,lang:'id'},{t:t.model||t.ja,lang:'ja'},{t:AUTO_ID,lang:'id'}])}
 function tickPoint(pt){st.tick=st.tick.includes(pt)?st.tick.filter(x=>x!==pt):[...st.tick,pt];TaskRun()}
 function setSafety(on){const t=taskBy(st.tid);t.safetyAt=on?nowStr():'';t.log.push(nowStr()+(on?' 安全確認':' 安全確認取消'));saveTask(t);TaskRun()}
 function reciteOk(){const t=taskBy(st.tid);
@@ -760,7 +767,7 @@ function Settings(){
   <div class="card"><h2>📄 GAS（シート・翻訳・LINE）</h2><input id="gas" value="${esc(S.get('kj_gas',''))}" placeholder="https://script.google.com/macros/s/.../exec"></div>
   <button class="btn" onclick="saveSettings()">設定を保存</button>
   <div class="card" style="margin-top:12px"><button class="btn warn" onclick="if(confirm('この端末の学習記録を消しますか？（シートは消えません）')){S.set('kj_records',[]);toast('消去しました')}">この端末の学習記録を消す</button>
-  <p class="small">${APP_VER}　今日の作業指示（復唱→作業確認）</p></div>`;
+  <p class="small">${APP_VER}　分からない時のインドネシア語ボタン</p></div>`;
 }
 function saveSettings(){
   S.set('kj_eval',$('ev').value.trim());S.set('kj_pin',$('pin').value.trim());S.set('kj_gas',$('gas').value.trim());
